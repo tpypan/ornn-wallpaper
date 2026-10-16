@@ -1,0 +1,24 @@
+#!/bin/zsh
+# Ornn fluted-glass wallpaper picker.
+#   ./picker          open the picker in Chrome (starts the local helper if it isn't running)
+#   ./picker 385.5    render that frame (seconds) and set it as the wallpaper without opening the UI
+set -euo pipefail
+dir=${0:A:h}
+port=8765
+url="http://127.0.0.1:$port/"
+
+if ! curl -fsS -m 1 "${url}api/status" >/dev/null 2>&1; then
+  nohup python3 -I "$dir/serve.py" --port $port >"${TMPDIR:-/tmp}/ornn-picker.log" 2>&1 &!
+  for _ in {1..50}; do
+    curl -fsS -m 1 "${url}api/status" >/dev/null 2>&1 && break
+    sleep 0.1
+  done
+fi
+
+if (( $# )); then
+  exec uv run --quiet --with websockets python -I "$dir/render.py" "$url" "$1"
+elif [[ -d "/Applications/Google Chrome.app" ]]; then
+  open -a "Google Chrome" "$url"
+else
+  open "$url"
+fi

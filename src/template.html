@@ -1,0 +1,747 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ornn Frame Picker</title>
+<style>
+  :root {
+    --bg: #0b0b0c;
+    --panel: #151517;
+    --panel-2: #1d1d20;
+    --line: #2a2a2e;
+    --text: #ececee;
+    --muted: #8d8d94;
+    --accent: #d18c47;
+    --accent-ink: #1a1007;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body { font: 14px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; padding: 20px 24px 40px; }
+  h1 { font-size: 17px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 12.5px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+  .previews { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 900px) { .previews { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: 0; }
+  .stage { position: relative; width: 100%; border-radius: 6px; overflow: hidden; background: #000; cursor: ns-resize; }
+  .stage canvas { display: block; width: 100%; height: 100%; }
+  .air-guide { position: absolute; top: 0; bottom: 0; border-left: 1px dashed rgba(255,255,255,.55); border-right: 1px dashed rgba(255,255,255,.55); pointer-events: none; }
+  .air-guide span { position: absolute; top: 6px; left: 8px; font-size: 11px; color: rgba(255,255,255,.75); }
+  button, select, input[type=number] {
+    font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 7px; padding: 6px 11px; cursor: pointer;
+  }
+  button:hover { border-color: #3a3a40; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  button:disabled { opacity: .45; cursor: default; }
+  input[type=number] { width: 92px; cursor: text; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: var(--panel-2); }
+  .seg button[aria-pressed=true] { background: #34343a; }
+  .controls { margin-top: 16px; display: grid; gap: 12px; }
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .grow { flex: 1; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .readout { font-variant-numeric: tabular-nums; color: var(--muted); min-width: 160px; }
+  .strip-wrap { margin-top: 16px; }
+  .strip { display: flex; gap: 6px; overflow-x: auto; padding: 4px 2px 10px; scroll-behavior: auto; }
+  .thumb { flex: 0 0 auto; width: 160px; cursor: pointer; border-radius: 6px; padding: 3px; border: 1px solid transparent; }
+  .thumb canvas { display: block; width: 100%; aspect-ratio: 16 / 9; border-radius: 4px; background: #000; }
+  .thumb .lbl { font-size: 11px; color: var(--muted); text-align: center; margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .thumb.current { border-color: var(--accent); }
+  .shortlist { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 7px; padding: 3px 4px 3px 3px; cursor: pointer; }
+  .chip canvas { width: 64px; height: 36px; border-radius: 4px; display: block; }
+  .chip .x { border: 0; background: transparent; color: var(--muted); padding: 0 6px; }
+  .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 18px 0 8px; }
+  .progress { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; margin-top: 8px; visibility: hidden; }
+  .progress > div { height: 100%; width: 0; background: var(--accent); transition: width .1s linear; }
+  .help { color: var(--muted); font-size: 12.5px; margin-top: 18px; line-height: 1.6; }
+  kbd { font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+  .err { color: #ff8a7a; }
+  #status:empty { display: none; }
+  .warn { color: #e8b86a; }
+  code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  #installed a { color: var(--accent); cursor: pointer; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Ornn fluted glass frame picker</h1>
+    <div class="sub">This renders ornn.com's hero shader live (seed 113, speed 0.15). The motion loops exactly every 8 min 43.6 s, and that one loop is all you can scrub. Saves one 5120×2880 sRGB PNG per colour, which is native on the Dell and fills the MacBook Air without upscaling.</div>
+  </div>
+  <div class="row">
+    <span class="sub">Preview framing</span>
+    <div class="seg" id="framing">
+      <button data-v="dell" aria-pressed="true">Dell 27″ · 16:9</button>
+      <button data-v="air" aria-pressed="false">MacBook Air 13″</button>
+    </div>
+  </div>
+</header>
+
+<div class="previews">
+  <div class="card" data-colour="copper">
+    <div class="card-head"><div><span class="swatch" style="background:#d18c47"></span>Copper <span class="sub">· rgb(209,140,71), site hero</span></div></div>
+    <div class="stage"><canvas></canvas><div class="air-guide"><span>MacBook Air area</span></div></div>
+  </div>
+  <div class="card" data-colour="gray">
+    <div class="card-head"><div><span class="swatch" style="background:#8c8c8c"></span>Gray <span class="sub">· #8c8c8c, site token</span></div></div>
+    <div class="stage"><canvas></canvas><div class="air-guide"><span>MacBook Air area</span></div></div>
+  </div>
+</div>
+
+<div class="controls card">
+  <div class="row">
+    <button id="play" title="Space">▶ Play</button>
+    <button id="prev" title="← one frame">‹ frame</button>
+    <button id="next" title="→ one frame">frame ›</button>
+    <div class="grow"><input type="range" id="slider" min="0" max="523.598776" step="0.0166667" value="0"></div>
+    <span class="readout" id="readout"></span>
+  </div>
+  <div class="row">
+    <label class="sub">Time (s) <input type="number" id="tInput" min="0" step="0.01" value="0"></label>
+    <button id="random">Random frame</button>
+    <button id="star" title="S">★ Add to shortlist</button>
+    <span class="grow"></span>
+    <button id="download" title="Save both PNGs to Downloads instead">Download PNGs</button>
+    <button class="primary" id="apply">Set as wallpaper</button>
+  </div>
+  <div class="progress" id="progress"><div></div></div>
+  <div class="sub" id="status"></div>
+  <div class="sub" id="installed"></div>
+</div>
+
+<div class="strip-wrap">
+  <div class="row">
+    <div class="section-title" style="margin:0">Frames · one per second · full loop 0–523 s</div>
+    <span class="grow"></span>
+    <div class="seg" id="stripColour">
+      <button data-v="copper" aria-pressed="true">Copper</button>
+      <button data-v="gray" aria-pressed="false">Gray</button>
+    </div>
+  </div>
+  <div class="strip" id="strip"></div>
+</div>
+
+<div class="section-title">Shortlist</div>
+<div class="shortlist" id="shortlist"><span class="sub">Press <kbd>S</kbd> or ★ to keep frames you like here.</span></div>
+
+<div class="help">
+  <b>Navigate.</b> Scroll over a preview to scrub (hold <kbd>⇧</kbd> for fine steps). <kbd>←</kbd>/<kbd>→</kbd> moves one frame (1/60 s), <kbd>⇧</kbd>+arrow moves 1 s, and <kbd>Space</kbd> plays the motion at site speed. Click a frame in the strip to jump to it. Scrubbing past the end wraps to the start, because 523.6 s is the same image as 0 s.<br>
+  <b>Set as wallpaper.</b> Renders both colours at 5120×2880 (128 passes, sRGB) and replaces <code>~/Pictures/Wallpapers/ornn-fluted-copper.png</code> and <code>ornn-fluted-gray.png</code> in place. Your desktop then refreshes on its own. The filenames never change, so your wallpaper setting keeps working. The frame's time is stored inside each PNG, and the picker reopens on it next time.<br>
+  <b>Why one size.</b> The Dell at "looks like 2560×1440" draws at exactly 5120×2880. The Air on "More Space" draws at 3420×2224, so "Fill Screen" shrinks the file to 0.77× and trims the sides to the dashed area. Neither display ever upscales it.<br>
+  <b>First time only.</b> In System Settings → Wallpaper, choose <code>ornn-fluted-copper.png</code> (or gray) with "Fill Screen". After that, this button is all you need.
+</div>
+
+<canvas id="gl" width="1" height="1" style="display:none"></canvas>
+
+<script>
+"use strict";
+// ---------- Shader: ornn.com "Bands" fragment, verbatim except three marked lines ----------
+const FRAGMENT_BODY = `__FRAGMENT__`;
+
+const HEADER = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+out vec4 fragColor;
+uniform float u_time;
+uniform vec2 u_resolution;
+uniform vec4 u_colors[8];
+uniform int u_colors_length;
+uniform float u_seed;
+uniform float u_speed;
+uniform float u_ephemeralAmp;
+uniform float u_lensScale;
+uniform float u_lensSpacingX;
+uniform float u_lensSpacingY;
+uniform float u_lensRadius;
+uniform float u_dispersionStrength;
+uniform float u_edgeDisp;
+// Picker additions: tile origin/size, subpixel + noise jitter, running sum
+uniform vec2 u_offset;
+uniform vec2 u_tile;
+uniform vec3 u_jitter;
+uniform sampler2D u_prev;
+`;
+
+const VERT = `#version 300 es
+in vec2 a_position;
+out vec2 v_uv;
+void main() { v_uv = a_position * 0.5 + 0.5; gl_Position = vec4(a_position, 0.0, 1.0); }`;
+
+// Averages the running sum, flips Y (so readPixels is top-down) and adds TPDF dither before 8-bit quantisation
+const RESOLVE = `#version 300 es
+precision highp float;
+uniform sampler2D u_acc;
+uniform uint u_frame;
+out vec4 o;
+uvec3 pcg(uvec3 v) {
+  v = v * 1664525u + 1013904223u;
+  v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y;
+  v ^= v >> 16u;
+  v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y;
+  return v;
+}
+void main() {
+  ivec2 size = textureSize(u_acc, 0);
+  ivec2 p = ivec2(gl_FragCoord.xy);
+  vec4 a = texelFetch(u_acc, ivec2(p.x, size.y - 1 - p.y), 0);
+  vec3 c = a.rgb / max(a.a, 1.0);
+  vec3 r1 = vec3(pcg(uvec3(uvec2(p), u_frame))) / 4294967295.0;
+  vec3 r2 = vec3(pcg(uvec3(uvec2(p) + 7919u, u_frame + 104729u))) / 4294967295.0;
+  c += (r1 + r2 - 1.0) / 255.0;
+  o = vec4(clamp(c, 0.0, 1.0), 1.0);
+}`;
+
+const COLOURS = {
+  copper: [[0, 0, 0, 1], [209 / 255, 140 / 255, 71 / 255, 1], [0, 0, 0, 1]],
+  gray:   [[0, 0, 0, 1], [140 / 255, 140 / 255, 140 / 255, 1], [0, 0, 0, 1]],
+};
+// Hero uniforms from ornn.com (copper hero block; gray token swapped into the middle stop)
+const PARAMS = {
+  u_seed: 113, u_speed: 0.15, u_ephemeralAmp: 0, u_lensScale: 10, u_lensSpacingX: 1.21,
+  u_lensSpacingY: 0.01, u_lensRadius: 0.58, u_dispersionStrength: 0, u_edgeDisp: 0.6,
+};
+const DISPLAYS = {
+  dell: { w: 5120, h: 2880, label: "Dell" },
+  air: { w: 3420, h: 2224, label: "Air" },
+};
+const FPS = 60;
+// Every time term in the shader runs at 1, 0.3, 0.8 or 3.5 rad per unit of t*0.8 (t = u_time * u_speed);
+// all four realign after 20π, so the animation repeats exactly every 20π / (0.8 * speed) seconds (~523.6 s)
+const PERIOD = 20 * Math.PI / (0.8 * PARAMS.u_speed);
+
+// ---------- GL setup ----------
+const glCanvas = document.getElementById("gl");
+const gl = glCanvas.getContext("webgl2", { antialias: false, premultipliedAlpha: false, preserveDrawingBuffer: false });
+const statusEl = document.getElementById("status");
+if (!gl || !gl.getExtension("EXT_color_buffer_float")) {
+  statusEl.innerHTML = '<span class="err">WebGL2 with float render targets is not available in this browser.</span>';
+  throw new Error("no webgl2 float");
+}
+
+function compile(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+  return s;
+}
+function program(fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compile(gl.VERTEX_SHADER, VERT));
+  gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));
+  gl.bindAttribLocation(p, 0, "a_position");
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  const loc = {};
+  const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+  for (let i = 0; i < n; i++) {
+    const name = gl.getActiveUniform(p, i).name;
+    loc[name.replace(/\[0\]$/, "")] = gl.getUniformLocation(p, name);
+  }
+  return { p, loc };
+}
+const mainProg = program(HEADER + FRAGMENT_BODY);
+const resolveProg = program(RESOLVE);
+
+const vao = gl.createVertexArray();
+gl.bindVertexArray(vao);
+const vbo = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+gl.enableVertexAttribArray(0);
+gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+function makeTarget(w, h, float) {
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  // NEAREST: float textures are incomplete under LINEAR without OES_texture_float_linear
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texStorage2D(gl.TEXTURE_2D, 1, float ? gl.RGBA32F : gl.RGBA8, w, h);
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  return { tex, fbo };
+}
+function freeTarget(t) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); }
+
+// Running-sum accumulator: ping-pongs two RGBA32F targets, alpha carries the pass count
+class Accumulator {
+  constructor(w, h) {
+    this.w = w; this.h = h;
+    this.sum = [makeTarget(w, h, true), makeTarget(w, h, true)];
+    this.out = makeTarget(w, h, false);
+    this.reset();
+  }
+  reset() {
+    this.idx = 0; this.count = 0;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.sum[0].fbo);
+    gl.clearBufferfv(gl.COLOR, 0, [0, 0, 0, 0]);
+  }
+  addPasses(n, { t, colours, full, offset }) {
+    const { loc } = mainProg;
+    gl.useProgram(mainProg.p);
+    gl.viewport(0, 0, this.w, this.h);
+    gl.uniform1f(loc.u_time, t);
+    gl.uniform2f(loc.u_resolution, full[0], full[1]);
+    gl.uniform2f(loc.u_offset, offset[0], offset[1]);
+    gl.uniform2f(loc.u_tile, this.w, this.h);
+    gl.uniform4fv(loc.u_colors, colours.flat());
+    gl.uniform1i(loc.u_colors_length, colours.length);
+    for (const [k, v] of Object.entries(PARAMS)) gl.uniform1f(loc[k], v);
+    gl.uniform1i(loc.u_prev, 0);
+    gl.activeTexture(gl.TEXTURE0);
+    for (let i = 0; i < n; i++) {
+      const k = this.count;
+      // R2 low-discrepancy subpixel offsets; first pass sits on pixel centres like the site
+      const jx = k === 0 ? 0 : ((0.5 + k * 0.7548776662) % 1) - 0.5;
+      const jy = k === 0 ? 0 : ((0.5 + k * 0.5698402910) % 1) - 0.5;
+      gl.uniform3f(loc.u_jitter, jx, jy, k * 7919);
+      gl.bindTexture(gl.TEXTURE_2D, this.sum[this.idx].tex);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.sum[1 - this.idx].fbo);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      this.idx = 1 - this.idx;
+      this.count++;
+    }
+  }
+  // Returns top-down RGBA8 pixels
+  read(into) {
+    gl.useProgram(resolveProg.p);
+    gl.viewport(0, 0, this.w, this.h);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.sum[this.idx].tex);
+    gl.uniform1i(resolveProg.loc.u_acc, 0);
+    gl.uniform1ui(resolveProg.loc.u_frame, this.count);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.out.fbo);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    const buf = into || new Uint8ClampedArray(this.w * this.h * 4);
+    gl.readPixels(0, 0, this.w, this.h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    return buf;
+  }
+  free() { this.sum.forEach(freeTarget); freeTarget(this.out); }
+}
+
+// ---------- State ----------
+const state = {
+  t: 0,
+  framing: "dell",
+  stripColour: "copper",
+  playing: false,
+  exporting: false,
+};
+const slider = document.getElementById("slider");
+const tInput = document.getElementById("tInput");
+const readout = document.getElementById("readout");
+
+function setT(t, { fromSlider = false, scrollStrip = true } = {}) {
+  t = ((t % PERIOD) + PERIOD) % PERIOD; // the loop is seamless, so wrap instead of clamping
+  state.t = t;
+  if (!fromSlider) slider.value = t;
+  tInput.value = t.toFixed(2);
+  readout.textContent = `t = ${t.toFixed(2)} / ${PERIOD.toFixed(2)} s · frame ${Math.round(t * FPS)} of ${Math.round(PERIOD * FPS)}`;
+  previews.forEach((p) => p.acc && p.acc.reset());
+  highlightStrip(scrollStrip);
+}
+
+// ---------- Previews ----------
+const previews = [...document.querySelectorAll(".card[data-colour]")].map((card) => ({
+  colour: card.dataset.colour,
+  card,
+  stage: card.querySelector(".stage"),
+  canvas: card.querySelector("canvas"),
+  guide: card.querySelector(".air-guide"),
+  acc: null,
+  image: null,
+}));
+
+function layoutPreviews() {
+  const d = DISPLAYS[state.framing];
+  for (const p of previews) {
+    const cssW = p.stage.clientWidth;
+    const cssH = Math.round(cssW * d.h / d.w);
+    p.stage.style.height = cssH + "px";
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = Math.max(16, Math.round(cssW * dpr));
+    const h = Math.max(16, Math.round(w * d.h / d.w));
+    if (!p.acc || p.acc.w !== w || p.acc.h !== h) {
+      if (p.acc) p.acc.free();
+      p.acc = new Accumulator(w, h);
+      p.canvas.width = w; p.canvas.height = h;
+      p.image = new ImageData(w, h);
+    } else p.acc.reset();
+    // Air area inside the Dell frame: full height, width scaled by aspect
+    if (state.framing === "dell") {
+      const frac = (DISPLAYS.air.w / DISPLAYS.air.h) / (DISPLAYS.dell.w / DISPLAYS.dell.h);
+      p.guide.style.display = "block";
+      p.guide.style.left = ((1 - frac) / 2 * 100) + "%";
+      p.guide.style.right = ((1 - frac) / 2 * 100) + "%";
+    } else p.guide.style.display = "none";
+  }
+}
+
+function previewJob(p) {
+  return { t: state.t, colours: COLOURS[p.colour], full: [p.acc.w, p.acc.h], offset: [0, 0] };
+}
+
+// ---------- Filmstrip ----------
+const strip = document.getElementById("strip");
+const thumbs = [];
+const THUMB_W = 320, THUMB_H = 180;
+let thumbAcc = null;
+const thumbQueue = new Set();
+const thumbObserver = new IntersectionObserver((entries) => {
+  for (const e of entries) {
+    const th = thumbs[+e.target.dataset.i];
+    if (e.isIntersecting && th.renderedFor !== state.stripColour) thumbQueue.add(th);
+    else if (!e.isIntersecting) thumbQueue.delete(th);
+  }
+}, { root: strip, rootMargin: "0px 400px" });
+
+for (let s = 0; s < PERIOD; s++) {
+  const el = document.createElement("div");
+  el.className = "thumb";
+  el.dataset.i = s;
+  el.innerHTML = `<canvas width="${THUMB_W}" height="${THUMB_H}"></canvas><div class="lbl">${s} s</div>`;
+  el.addEventListener("click", () => setT(s, { scrollStrip: false }));
+  strip.appendChild(el);
+  const th = { t: s, el, canvas: el.querySelector("canvas"), renderedFor: null };
+  thumbs.push(th);
+  thumbObserver.observe(el);
+}
+let lastCurrent = null;
+function highlightStrip(scroll) {
+  const th = thumbs[Math.round(state.t) % thumbs.length];
+  if (lastCurrent && lastCurrent !== th) lastCurrent.el.classList.remove("current");
+  th.el.classList.add("current");
+  lastCurrent = th;
+  if (scroll) {
+    const target = th.el.offsetLeft - strip.clientWidth / 2 + th.el.clientWidth / 2;
+    strip.scrollLeft = target;
+  }
+}
+// Vertical wheel scrolls the strip sideways
+strip.addEventListener("wheel", (e) => {
+  if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { strip.scrollLeft += e.deltaY; e.preventDefault(); }
+}, { passive: false });
+
+function renderThumb(th, colour, canvas) {
+  if (!thumbAcc) thumbAcc = new Accumulator(THUMB_W, THUMB_H);
+  thumbAcc.reset();
+  thumbAcc.addPasses(4, { t: th.t, colours: COLOURS[colour], full: [THUMB_W, THUMB_H], offset: [0, 0] });
+  const img = new ImageData(thumbAcc.read(), THUMB_W, THUMB_H);
+  (canvas || th.canvas).getContext("2d").putImageData(img, 0, 0);
+}
+
+// ---------- Shortlist ----------
+const shortlistEl = document.getElementById("shortlist");
+let shortlist = [];
+try { shortlist = JSON.parse(localStorage.getItem("ornn-shortlist") || "[]"); } catch { shortlist = []; }
+function saveShortlist() { try { localStorage.setItem("ornn-shortlist", JSON.stringify(shortlist)); } catch {} }
+function drawShortlist() {
+  shortlistEl.innerHTML = "";
+  if (!shortlist.length) {
+    shortlistEl.innerHTML = '<span class="sub">Press <kbd>S</kbd> or ★ to keep frames you like here.</span>';
+    return;
+  }
+  for (const t of shortlist) {
+    const chip = document.createElement("div");
+    chip.className = "chip";
+    chip.innerHTML = `<canvas width="${THUMB_W}" height="${THUMB_H}"></canvas><span>${t.toFixed(2)} s</span><button class="x" title="Remove">×</button>`;
+    chip.addEventListener("click", (e) => {
+      if (e.target.classList.contains("x")) {
+        shortlist = shortlist.filter((x) => x !== t); saveShortlist(); drawShortlist();
+      } else setT(t);
+    });
+    shortlistEl.appendChild(chip);
+    renderThumb({ t }, "copper", chip.querySelector("canvas"));
+  }
+}
+
+// ---------- PNG export (RGB8 + embedded sRGB ICC profile) ----------
+const ICCP_B64 = "__ICCP_B64__";
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(parts) {
+  let c = 0xffffffff;
+  for (const p of parts) for (let i = 0; i < p.length; i++) c = CRC_TABLE[(c ^ p[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+function chunk(type, data) {
+  const head = new Uint8Array(8);
+  const dv = new DataView(head.buffer);
+  dv.setUint32(0, data.length);
+  const typeBytes = new TextEncoder().encode(type);
+  head.set(typeBytes, 4);
+  const tail = new Uint8Array(4);
+  new DataView(tail.buffer).setUint32(0, crc32([typeBytes, data]));
+  return [head, data, tail];
+}
+async function encodePNG(rgba, w, h, meta) {
+  const stride = w * 3 + 1;
+  const raw = new Uint8Array(stride * h);
+  for (let y = 0; y < h; y++) {
+    let o = y * stride, s = y * w * 4;
+    raw[o++] = 1; // Sub filter
+    let pr = 0, pg = 0, pb = 0;
+    for (let x = 0; x < w; x++, s += 4) {
+      const r = rgba[s], g = rgba[s + 1], b = rgba[s + 2];
+      raw[o++] = (r - pr) & 255; raw[o++] = (g - pg) & 255; raw[o++] = (b - pb) & 255;
+      pr = r; pg = g; pb = b;
+    }
+  }
+  const z = new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream("deflate"))).arrayBuffer());
+  const ihdr = new Uint8Array(13);
+  const dv = new DataView(ihdr.buffer);
+  dv.setUint32(0, w); dv.setUint32(4, h);
+  ihdr.set([8, 2, 0, 0, 0], 8); // 8-bit, truecolour RGB, no alpha
+  const iccp = Uint8Array.from(atob(ICCP_B64), (c) => c.charCodeAt(0));
+  return new Blob([
+    new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
+    ...chunk("IHDR", ihdr), ...chunk("iCCP", iccp),
+    // tEXt "ornn-frame": which frame this is, read back by serve.py and the picker
+    ...(meta ? chunk("tEXt", new TextEncoder().encode("ornn-frame\0" + JSON.stringify(meta))) : []),
+    ...chunk("IDAT", z), ...chunk("IEND", new Uint8Array(0)),
+  ], { type: "image/png" });
+}
+
+// MessageChannel yield keeps exports running when the tab is in the background (rAF pauses there)
+const yieldChannel = new MessageChannel();
+const yieldQueue = [];
+yieldChannel.port1.onmessage = () => yieldQueue.shift()?.();
+const yieldTask = () => new Promise((r) => { yieldQueue.push(r); yieldChannel.port2.postMessage(0); });
+// Renders the full-resolution frame in tiles so float buffers stay small; returns top-down RGBA8
+async function renderFull(colour, W, H, t, passes, onProgress) {
+  const out = new Uint8Array(W * H * 4);
+  const nx = Math.ceil(W / 1280), ny = Math.ceil(H / 1280);
+  const tw = Math.ceil(W / nx), th = Math.ceil(H / ny);
+  let done = 0;
+  for (let ty = 0; ty < ny; ty++) for (let tx = 0; tx < nx; tx++) {
+    const ox = tx * tw, oy = ty * th;
+    const w = Math.min(tw, W - ox), h = Math.min(th, H - oy);
+    const acc = new Accumulator(w, h);
+    for (let p = 0; p < passes; p += 8) {
+      acc.addPasses(Math.min(8, passes - p), { t, colours: COLOURS[colour], full: [W, H], offset: [ox, oy] });
+      gl.finish();
+      await yieldTask();
+      onProgress && onProgress((done + (p + 8) / passes) / (nx * ny));
+    }
+    const px = acc.read(new Uint8Array(w * h * 4));
+    acc.free();
+    // Tile rows arrive top-down within the tile; GL tile origin is bottom-left of the full image
+    const top = H - oy - h;
+    for (let r = 0; r < h; r++) out.set(px.subarray(r * w * 4, (r + 1) * w * 4), ((top + r) * W + ox) * 4);
+    done++;
+  }
+  return out;
+}
+
+const progressEl = document.getElementById("progress");
+const installedEl = document.getElementById("installed");
+const applyBtn = document.getElementById("apply");
+const downloadBtn = document.getElementById("download");
+// One file per colour serves both displays: native on the Dell, Fill Screen downscale on the Air
+const EXPORT = { w: 5120, h: 2880, passes: 128 };
+const server = { available: false, status: null };
+
+async function api(method, path, body) {
+  const r = await fetch(path, { method, body, headers: { "X-Ornn-Picker": "1" } });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.status);
+  return j;
+}
+
+async function refreshInstalled() {
+  if (!location.protocol.startsWith("http")) {
+    applyBtn.style.display = "none";
+    installedEl.innerHTML = 'Opened as a file, so only downloads work. Run <code>./picker</code> to save straight to your wallpaper.';
+    return null;
+  }
+  try {
+    server.status = await api("GET", "/api/status");
+    server.available = true;
+  } catch {
+    server.available = false;
+    applyBtn.disabled = true;
+    installedEl.innerHTML = '<span class="warn">The picker helper isn\'t running. Run <code>./picker</code> again to save to your wallpaper.</span>';
+    return null;
+  }
+  applyBtn.disabled = false;
+  const st = server.status, f = st.files;
+  const parts = [];
+  const info = f.copper?.info || f.gray?.info;
+  if (info) parts.push(`Current wallpaper frame: <a id="jumpInstalled">${info.t.toFixed(2)} s</a>, ${["copper", "gray"].filter((c) => f[c]).join(" + ")}, in <code>${st.dir.replace(/^\/Users\/[^/]+/, "~")}</code>.`);
+  else parts.push("No frame saved yet.");
+  if (!st.usesStable) {
+    parts.push(`<span class="warn">One-time step: in System Settings → Wallpaper, choose <code>ornn-fluted-copper.png</code> or <code>ornn-fluted-gray.png</code> with "Fill Screen". After that, "Set as wallpaper" updates your desktop directly.</span>`);
+  }
+  if (st.legacy.length) parts.push(`Older Ornn files (${st.legacy.join(", ")}) go to the Trash on the next save, unless your wallpaper still uses them.`);
+  installedEl.innerHTML = parts.join("<br>");
+  document.getElementById("jumpInstalled")?.addEventListener("click", () => setT(info.t));
+  return info;
+}
+
+// mode "install" replaces the wallpaper files through the helper; "download" saves the PNGs to Downloads
+async function exportFrame(mode) {
+  if (state.exporting) return null;
+  state.exporting = true; state.playing = false; updatePlay();
+  applyBtn.disabled = downloadBtn.disabled = true;
+  const t = Math.round(state.t * 100) / 100;
+  const bar = progressEl.firstElementChild;
+  progressEl.style.visibility = "visible";
+  try {
+    const colours = ["copper", "gray"];
+    const blobs = {};
+    for (const [i, colour] of colours.entries()) {
+      statusEl.textContent = `Rendering ${colour} at ${t.toFixed(2)} s (${i + 1}/2)…`;
+      const px = await renderFull(colour, EXPORT.w, EXPORT.h, t, EXPORT.passes,
+        (f) => { bar.style.width = (((i + f) / colours.length) * 100).toFixed(1) + "%"; });
+      statusEl.textContent = `Encoding ${colour}…`;
+      blobs[colour] = await encodePNG(px, EXPORT.w, EXPORT.h,
+        { t, colour, w: EXPORT.w, h: EXPORT.h, passes: EXPORT.passes, source: "ornn.com hero shader, seed 113" });
+    }
+    let result;
+    if (mode === "install") {
+      // Upload both before touching anything else, so a failure never leaves a half-applied pair
+      for (const c of colours) await api("PUT", `/api/wallpaper/${c}`, blobs[c]);
+      result = await api("POST", "/api/finish");
+      const trashed = result.trashed.length ? ` Moved to Trash: ${result.trashed.join(", ")}.` : "";
+      statusEl.textContent = `Wallpaper set to ${t.toFixed(2)} s in copper and gray.${trashed}`;
+      await refreshInstalled();
+    } else {
+      for (const c of colours) {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blobs[c]);
+        a.download = `ornn-fluted-${c}-t${t.toFixed(2)}s-${EXPORT.w}x${EXPORT.h}.png`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+      }
+      statusEl.textContent = `Downloaded copper and gray at ${t.toFixed(2)} s.`;
+    }
+    return { t, mode, sizes: Object.fromEntries(colours.map((c) => [c, blobs[c].size])), result };
+  } catch (e) {
+    statusEl.innerHTML = `<span class="err">${mode === "install" ? "Saving" : "Download"} failed: ${e.message}</span>`;
+    throw e;
+  } finally {
+    progressEl.style.visibility = "hidden";
+    state.exporting = false;
+    applyBtn.disabled = !server.available;
+    downloadBtn.disabled = false;
+  }
+}
+
+// ---------- Main loop: progressive refinement ----------
+const PREVIEW_TARGET = 32;
+let lastTime = performance.now();
+function tick(now) {
+  const dt = Math.min(0.1, (now - lastTime) / 1000);
+  lastTime = now;
+  if (!state.exporting) {
+    if (state.playing) {
+      setT(state.t + dt);
+    }
+    const target = state.playing ? 1 : PREVIEW_TARGET;
+    for (const p of previews) {
+      if (p.acc.count >= target) continue;
+      const n = p.acc.count === 0 ? 1 : 3;
+      p.acc.addPasses(Math.min(n, target - p.acc.count), previewJob(p));
+      p.acc.read(p.image.data);
+      p.canvas.getContext("2d").putImageData(p.image, 0, 0);
+    }
+    // Spend leftover frames on filmstrip thumbnails
+    const idle = previews.every((p) => p.acc.count >= target);
+    if (idle || !state.playing) {
+      let budget = idle ? 4 : 1;
+      for (const th of thumbQueue) {
+        if (budget-- <= 0) break;
+        renderThumb(th, state.stripColour);
+        th.renderedFor = state.stripColour;
+        thumbQueue.delete(th);
+      }
+    }
+  }
+  requestAnimationFrame(tick);
+}
+
+// ---------- Wiring ----------
+const playBtn = document.getElementById("play");
+function updatePlay() { playBtn.textContent = state.playing ? "❚❚ Pause" : "▶ Play"; }
+playBtn.addEventListener("click", () => { state.playing = !state.playing; updatePlay(); });
+document.getElementById("prev").addEventListener("click", () => setT(state.t - 1 / FPS));
+document.getElementById("next").addEventListener("click", () => setT(state.t + 1 / FPS));
+document.getElementById("random").addEventListener("click", () => setT(Math.floor(Math.random() * PERIOD * FPS) / FPS));
+slider.addEventListener("input", () => setT(+slider.value, { fromSlider: true }));
+tInput.addEventListener("change", () => setT(+tInput.value || 0));
+function addStar() {
+  const t = Math.round(state.t * 1000) / 1000;
+  if (!shortlist.includes(t)) { shortlist.push(t); shortlist.sort((a, b) => a - b); saveShortlist(); drawShortlist(); }
+}
+document.getElementById("star").addEventListener("click", addStar);
+
+for (const p of previews) {
+  p.stage.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const d = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+    // Trackpad-friendly: ~1 s per 100 px of scroll, 1 frame per notch-ish with Shift
+    setT(state.t + d * (e.shiftKey ? 1 / FPS / 20 : 0.01));
+  }, { passive: false });
+}
+applyBtn.addEventListener("click", () => exportFrame("install").catch(() => {}));
+downloadBtn.addEventListener("click", () => exportFrame("download").catch(() => {}));
+
+function segmented(id, key, onChange) {
+  const el = document.getElementById(id);
+  el.addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    el.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", x === b));
+    state[key] = b.dataset.v;
+    onChange();
+  });
+}
+segmented("framing", "framing", layoutPreviews);
+segmented("stripColour", "stripColour", () => {
+  for (const th of thumbs) {
+    const r = th.el.getBoundingClientRect(), s = strip.getBoundingClientRect();
+    if (r.right > s.left - 400 && r.left < s.right + 400) thumbQueue.add(th);
+  }
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  if (e.key === "ArrowRight") { setT(state.t + (e.shiftKey ? 1 : 1 / FPS)); e.preventDefault(); }
+  else if (e.key === "ArrowLeft") { setT(state.t - (e.shiftKey ? 1 : 1 / FPS)); e.preventDefault(); }
+  else if (e.key === " ") { state.playing = !state.playing; updatePlay(); e.preventDefault(); }
+  else if (e.key === "s" || e.key === "S") addStar();
+});
+
+let resizeTimer;
+window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(layoutPreviews, 120); });
+
+layoutPreviews();
+setT(0);
+drawShortlist();
+requestAnimationFrame(tick);
+// Open on the frame that is currently installed
+const ready = refreshInstalled().then((info) => { if (info) setT(info.t); return info; });
+
+// Hooks for ./picker <seconds> (headless install) and tests
+window.__picker = { renderFull, encodePNG, exportFrame, refreshInstalled, setT, state, ready };
+</script>
+</body>
+</html>
