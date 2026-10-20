@@ -29,8 +29,8 @@
   .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: 0; }
   .stage { position: relative; width: 100%; border-radius: 6px; overflow: hidden; background: #000; cursor: ns-resize; }
   .stage canvas { display: block; width: 100%; height: 100%; }
-  .air-guide { position: absolute; top: 0; bottom: 0; border-left: 1px dashed rgba(255,255,255,.55); border-right: 1px dashed rgba(255,255,255,.55); pointer-events: none; }
-  .air-guide span { position: absolute; top: 6px; left: 8px; font-size: 11px; color: rgba(255,255,255,.75); }
+  .guide { position: absolute; border: 1px dashed rgba(255,255,255,.55); pointer-events: none; }
+  .guide span { position: absolute; top: 6px; left: 8px; font-size: 11px; color: rgba(255,255,255,.75); }
   button, select, input[type=number] {
     font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line);
     border-radius: 7px; padding: 6px 11px; cursor: pointer;
@@ -50,12 +50,12 @@
   .strip-wrap { margin-top: 16px; }
   .strip { display: flex; gap: 6px; overflow-x: auto; padding: 4px 2px 10px; scroll-behavior: auto; }
   .thumb { flex: 0 0 auto; width: 160px; cursor: pointer; border-radius: 6px; padding: 3px; border: 1px solid transparent; }
-  .thumb canvas { display: block; width: 100%; aspect-ratio: 16 / 9; border-radius: 4px; background: #000; }
+  .thumb canvas { display: block; width: 100%; aspect-ratio: var(--aspect, 16 / 9); border-radius: 4px; background: #000; }
   .thumb .lbl { font-size: 11px; color: var(--muted); text-align: center; margin-top: 3px; font-variant-numeric: tabular-nums; }
   .thumb.current { border-color: var(--accent); }
   .shortlist { display: flex; gap: 8px; flex-wrap: wrap; }
   .chip { display: inline-flex; align-items: center; gap: 6px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 7px; padding: 3px 4px 3px 3px; cursor: pointer; }
-  .chip canvas { width: 64px; height: 36px; border-radius: 4px; display: block; }
+  .chip canvas { width: 64px; aspect-ratio: var(--aspect, 16 / 9); border-radius: 4px; display: block; }
   .chip .x { border: 0; background: transparent; color: var(--muted); padding: 0 6px; }
   .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 18px 0 8px; }
   .progress { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; margin-top: 8px; visibility: hidden; }
@@ -73,25 +73,22 @@
 <header>
   <div>
     <h1>Ornn fluted glass frame picker</h1>
-    <div class="sub">This renders ornn.com's hero shader live (seed 113, speed 0.15). The motion loops exactly every 8 min 43.6 s, and that one loop is all you can scrub. Saves one 5120×2880 sRGB PNG per colour, which is native on the Dell and fills the MacBook Air without upscaling.</div>
+    <div class="sub">This renders ornn.com's hero shader live (seed 113, speed 0.15). The motion loops exactly every 8 min 43.6 s, and that one loop is all you can scrub. Saves one sRGB PNG per colour at <span id="exportSize">your displays' size</span>, large enough that "Fill Screen" never upscales it on any connected display.</div>
   </div>
   <div class="row">
     <span class="sub">Preview framing</span>
-    <div class="seg" id="framing">
-      <button data-v="dell" aria-pressed="true">Dell 27″ · 16:9</button>
-      <button data-v="air" aria-pressed="false">MacBook Air 13″</button>
-    </div>
+    <div class="seg" id="framing"></div>
   </div>
 </header>
 
 <div class="previews">
   <div class="card" data-colour="copper">
     <div class="card-head"><div><span class="swatch" style="background:#d18c47"></span>Copper <span class="sub">· rgb(209,140,71), site hero</span></div></div>
-    <div class="stage"><canvas></canvas><div class="air-guide"><span>MacBook Air area</span></div></div>
+    <div class="stage"><canvas></canvas></div>
   </div>
   <div class="card" data-colour="gray">
     <div class="card-head"><div><span class="swatch" style="background:#8c8c8c"></span>Gray <span class="sub">· #8c8c8c, site token</span></div></div>
-    <div class="stage"><canvas></canvas><div class="air-guide"><span>MacBook Air area</span></div></div>
+    <div class="stage"><canvas></canvas></div>
   </div>
 </div>
 
@@ -133,8 +130,8 @@
 
 <div class="help">
   <b>Navigate.</b> Scroll over a preview to scrub (hold <kbd>⇧</kbd> for fine steps). <kbd>←</kbd>/<kbd>→</kbd> moves one frame (1/60 s), <kbd>⇧</kbd>+arrow moves 1 s, and <kbd>Space</kbd> plays the motion at site speed. Click a frame in the strip to jump to it. Scrubbing past the end wraps to the start, because 523.6 s is the same image as 0 s.<br>
-  <b>Set as wallpaper.</b> Renders both colours at 5120×2880 (128 passes, sRGB) and replaces <code>~/Pictures/Wallpapers/ornn-fluted-copper.png</code> and <code>ornn-fluted-gray.png</code> in place. Your desktop then refreshes on its own. The filenames never change, so your wallpaper setting keeps working. The frame's time is stored inside each PNG, and the picker reopens on it next time.<br>
-  <b>Why one size.</b> The Dell at "looks like 2560×1440" draws at exactly 5120×2880. The Air on "More Space" draws at 3420×2224, so "Fill Screen" shrinks the file to 0.77× and trims the sides to the dashed area. Neither display ever upscales it.<br>
+  <b>Set as wallpaper.</b> Renders both colours (128 passes, sRGB) and replaces <code>~/Pictures/Wallpapers/ornn-fluted-copper.png</code> and <code>ornn-fluted-gray.png</code> in place. Your desktop then refreshes on its own. The filenames never change, so your wallpaper setting keeps working. The frame's time is stored inside each PNG, and the picker reopens on it next time.<br>
+  <b>Why one size.</b> The file is as wide as your widest display and as tall as your tallest, counted in real pixels (the "looks like" size × 2 on Retina). "Fill Screen" then only ever shrinks it, and trims whatever doesn't fit a display's shape. The dashed boxes show what each display keeps. Plug in a bigger display and the next save grows to match.<br>
   <b>First time only.</b> In System Settings → Wallpaper, choose <code>ornn-fluted-copper.png</code> (or gray) with "Fill Screen". After that, this button is all you need.
 </div>
 
@@ -207,10 +204,9 @@ const PARAMS = {
   u_seed: 113, u_speed: 0.15, u_ephemeralAmp: 0, u_lensScale: 10, u_lensSpacingX: 1.21,
   u_lensSpacingY: 0.01, u_lensRadius: 0.58, u_dispersionStrength: 0, u_edgeDisp: 0.6,
 };
-const DISPLAYS = {
-  dell: { w: 5120, h: 2880, label: "Dell" },
-  air: { w: 3420, h: 2224, label: "Air" },
-};
+// Wallpaper size: replaced by the helper's answer, which covers every connected display
+const EXPORT = { w: 5120, h: 2880, passes: 128 };
+let displays = [];
 const FPS = 60;
 // Every time term in the shader runs at 1, 0.3, 0.8 or 3.5 rad per unit of t*0.8 (t = u_time * u_speed);
 // all four realign after 20π, so the animation repeats exactly every 20π / (0.8 * speed) seconds (~523.6 s)
@@ -333,7 +329,7 @@ class Accumulator {
 // ---------- State ----------
 const state = {
   t: 0,
-  framing: "dell",
+  framing: "file", // "file" or a display index
   stripColour: "copper",
   playing: false,
   exporting: false,
@@ -358,44 +354,69 @@ const previews = [...document.querySelectorAll(".card[data-colour]")].map((card)
   card,
   stage: card.querySelector(".stage"),
   canvas: card.querySelector("canvas"),
-  guide: card.querySelector(".air-guide"),
   acc: null,
   image: null,
 }));
 
+// The part of the W×H file a display keeps under "Fill Screen": scaled to cover, centred, overflow trimmed
+function fillCrop(d) {
+  const k = Math.max(d.w / EXPORT.w, d.h / EXPORT.h);
+  const cw = Math.min(EXPORT.w, d.w / k), ch = Math.min(EXPORT.h, d.h / k);
+  return { x: (EXPORT.w - cw) / 2, y: (EXPORT.h - ch) / 2, w: cw, h: ch };
+}
+
 function layoutPreviews() {
-  const d = DISPLAYS[state.framing];
+  const d = displays[state.framing];
+  const crop = d ? fillCrop(d) : { x: 0, y: 0, w: EXPORT.w, h: EXPORT.h };
+  // Dashed boxes for each display shape that trims the file (identical shapes share one box)
+  const guides = new Map();
+  if (!d) for (const disp of displays) {
+    const c = fillCrop(disp);
+    if (c.w > EXPORT.w - 1 && c.h > EXPORT.h - 1) continue;
+    const key = `${Math.round(c.w)}x${Math.round(c.h)}`;
+    guides.set(key, { c, names: [...(guides.get(key)?.names || []), disp.name] });
+  }
   for (const p of previews) {
     const cssW = p.stage.clientWidth;
-    const cssH = Math.round(cssW * d.h / d.w);
+    const cssH = Math.round(cssW * crop.h / crop.w);
     p.stage.style.height = cssH + "px";
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const w = Math.max(16, Math.round(cssW * dpr));
-    const h = Math.max(16, Math.round(w * d.h / d.w));
+    const h = Math.max(16, Math.round(w * crop.h / crop.w));
     if (!p.acc || p.acc.w !== w || p.acc.h !== h) {
       if (p.acc) p.acc.free();
       p.acc = new Accumulator(w, h);
       p.canvas.width = w; p.canvas.height = h;
       p.image = new ImageData(w, h);
     } else p.acc.reset();
-    // Air area inside the Dell frame: full height, width scaled by aspect
-    if (state.framing === "dell") {
-      const frac = (DISPLAYS.air.w / DISPLAYS.air.h) / (DISPLAYS.dell.w / DISPLAYS.dell.h);
-      p.guide.style.display = "block";
-      p.guide.style.left = ((1 - frac) / 2 * 100) + "%";
-      p.guide.style.right = ((1 - frac) / 2 * 100) + "%";
-    } else p.guide.style.display = "none";
+    // Render the crop of the full file: scale the file so the crop spans the canvas, then shift to the crop
+    const s = w / crop.w;
+    p.full = [EXPORT.w * s, EXPORT.h * s];
+    p.offset = [crop.x * s, crop.y * s];
+    p.stage.querySelectorAll(".guide").forEach((g) => g.remove());
+    for (const { c, names } of guides.values()) {
+      const g = document.createElement("div");
+      g.className = "guide";
+      Object.assign(g.style, {
+        left: (c.x / EXPORT.w * 100) + "%", right: (c.x / EXPORT.w * 100) + "%",
+        top: (c.y / EXPORT.h * 100) + "%", bottom: (c.y / EXPORT.h * 100) + "%",
+      });
+      g.innerHTML = "<span></span>";
+      g.firstChild.textContent = names.join(", ");
+      p.stage.appendChild(g);
+    }
   }
 }
 
 function previewJob(p) {
-  return { t: state.t, colours: COLOURS[p.colour], full: [p.acc.w, p.acc.h], offset: [0, 0] };
+  return { t: state.t, colours: COLOURS[p.colour], full: p.full, offset: p.offset };
 }
 
 // ---------- Filmstrip ----------
 const strip = document.getElementById("strip");
 const thumbs = [];
-const THUMB_W = 320, THUMB_H = 180;
+const THUMB_W = 320;
+let THUMB_H = 180;
 let thumbAcc = null;
 const thumbQueue = new Set();
 const thumbObserver = new IntersectionObserver((entries) => {
@@ -434,6 +455,7 @@ strip.addEventListener("wheel", (e) => {
 }, { passive: false });
 
 function renderThumb(th, colour, canvas) {
+  if (thumbAcc && thumbAcc.h !== THUMB_H) { thumbAcc.free(); thumbAcc = null; }
   if (!thumbAcc) thumbAcc = new Accumulator(THUMB_W, THUMB_H);
   thumbAcc.reset();
   thumbAcc.addPasses(4, { t: th.t, colours: COLOURS[colour], full: [THUMB_W, THUMB_H], offset: [0, 0] });
@@ -555,8 +577,6 @@ const progressEl = document.getElementById("progress");
 const installedEl = document.getElementById("installed");
 const applyBtn = document.getElementById("apply");
 const downloadBtn = document.getElementById("download");
-// One file per colour serves both displays: native on the Dell, Fill Screen downscale on the Air
-const EXPORT = { w: 5120, h: 2880, passes: 128 };
 const server = { available: false, status: null };
 
 async function api(method, path, body) {
@@ -566,10 +586,41 @@ async function api(method, path, body) {
   return j;
 }
 
+// The file covers every display in pixels; without the helper, only this browser's screen is known
+function screenDisplays() {
+  const k = window.devicePixelRatio || 1;
+  return [{ name: "This display", w: Math.round(screen.width * k), h: Math.round(screen.height * k) }];
+}
+function setDisplays(list, size) {
+  const key = JSON.stringify([list, size]);
+  if (key === setDisplays.key) return;
+  setDisplays.key = key;
+  displays = list;
+  EXPORT.w = size.w; EXPORT.h = size.h;
+  if (!(state.framing in displays)) state.framing = "file";
+  document.getElementById("exportSize").textContent = `${EXPORT.w}×${EXPORT.h}`;
+  const seg = document.getElementById("framing");
+  seg.innerHTML = "";
+  for (const [v, label] of [["file", `Whole file · ${EXPORT.w}×${EXPORT.h}`], ...displays.map((d, i) => [String(i), d.name])]) {
+    const b = document.createElement("button");
+    b.dataset.v = v; b.textContent = label;
+    b.setAttribute("aria-pressed", String(v === String(state.framing)));
+    seg.appendChild(b);
+  }
+  seg.style.display = displays.length ? "" : "none";
+  // Thumbnails follow the file's shape
+  THUMB_H = Math.max(16, Math.round(THUMB_W * EXPORT.h / EXPORT.w));
+  document.documentElement.style.setProperty("--aspect", `${EXPORT.w} / ${EXPORT.h}`);
+  for (const th of thumbs) { th.canvas.height = THUMB_H; th.renderedFor = null; }
+  refreshVisibleThumbs();
+  layoutPreviews();
+  drawShortlist();
+}
+
 async function refreshInstalled() {
   if (!location.protocol.startsWith("http")) {
     applyBtn.style.display = "none";
-    installedEl.innerHTML = 'Opened as a file, so only downloads work. Run <code>./picker</code> to save straight to your wallpaper.';
+    installedEl.innerHTML = 'Opened as a file, so only downloads work, sized for this screen only. Run <code>./picker</code> to save straight to your wallpaper.';
     return null;
   }
   try {
@@ -583,14 +634,21 @@ async function refreshInstalled() {
   }
   applyBtn.disabled = false;
   const st = server.status, f = st.files;
+  setDisplays(st.displays.length ? st.displays : screenDisplays(), st.export);
   const parts = [];
   const info = f.copper?.info || f.gray?.info;
   if (info) parts.push(`Current wallpaper frame: <a id="jumpInstalled">${info.t.toFixed(2)} s</a>, ${["copper", "gray"].filter((c) => f[c]).join(" + ")}, in <code>${st.dir.replace(/^\/Users\/[^/]+/, "~")}</code>.`);
   else parts.push("No frame saved yet.");
-  if (!st.usesStable) {
-    parts.push(`<span class="warn">One-time step: in System Settings → Wallpaper, choose <code>ornn-fluted-copper.png</code> or <code>ornn-fluted-gray.png</code> with "Fill Screen". After that, "Set as wallpaper" updates your desktop directly.</span>`);
+  const sizedFor = st.export.override ? "set by ORNN_PICKER_SIZE" : `covers ${displays.map((d) => `${d.name} (${d.w}×${d.h})`).join(", ")}`;
+  parts.push(`Saves at ${EXPORT.w}×${EXPORT.h}, which ${sizedFor}.`);
+  if (info && info.w && (info.w > EXPORT.w || info.h > EXPORT.h)) {
+    parts.push(`<span class="warn">Your current files are ${info.w}×${info.h}. Saving now makes them smaller, sized for the displays connected right now.</span>`);
   }
-  if (st.legacy.length) parts.push(`Older Ornn files (${st.legacy.join(", ")}) go to the Trash on the next save, unless your wallpaper still uses them.`);
+  if (st.usesStable === false) {
+    parts.push(`<span class="warn">One-time step: in System Settings → Wallpaper, choose <code>ornn-fluted-copper.png</code> or <code>ornn-fluted-gray.png</code> with "Fill Screen". After that, "Set as wallpaper" updates your desktop directly.</span>`);
+  } else if (st.usesStable === null) {
+    parts.push(`If you haven't yet, set <code>ornn-fluted-copper.png</code> or <code>ornn-fluted-gray.png</code> as your wallpaper once (System Settings → Wallpaper, "Fill Screen").`);
+  }
   installedEl.innerHTML = parts.join("<br>");
   document.getElementById("jumpInstalled")?.addEventListener("click", () => setT(info.t));
   return info;
@@ -602,6 +660,7 @@ async function exportFrame(mode) {
   state.exporting = true; state.playing = false; updatePlay();
   applyBtn.disabled = downloadBtn.disabled = true;
   const t = Math.round(state.t * 100) / 100;
+  const { w: W, h: H } = EXPORT; // fixed for this export even if displays change meanwhile
   const bar = progressEl.firstElementChild;
   progressEl.style.visibility = "visible";
   try {
@@ -609,31 +668,30 @@ async function exportFrame(mode) {
     const blobs = {};
     for (const [i, colour] of colours.entries()) {
       statusEl.textContent = `Rendering ${colour} at ${t.toFixed(2)} s (${i + 1}/2)…`;
-      const px = await renderFull(colour, EXPORT.w, EXPORT.h, t, EXPORT.passes,
+      const px = await renderFull(colour, W, H, t, EXPORT.passes,
         (f) => { bar.style.width = (((i + f) / colours.length) * 100).toFixed(1) + "%"; });
       statusEl.textContent = `Encoding ${colour}…`;
-      blobs[colour] = await encodePNG(px, EXPORT.w, EXPORT.h,
-        { t, colour, w: EXPORT.w, h: EXPORT.h, passes: EXPORT.passes, source: "ornn.com hero shader, seed 113" });
+      blobs[colour] = await encodePNG(px, W, H,
+        { t, colour, w: W, h: H, passes: EXPORT.passes, source: "ornn.com hero shader, seed 113" });
     }
     let result;
     if (mode === "install") {
       // Upload both before touching anything else, so a failure never leaves a half-applied pair
       for (const c of colours) await api("PUT", `/api/wallpaper/${c}`, blobs[c]);
       result = await api("POST", "/api/finish");
-      const trashed = result.trashed.length ? ` Moved to Trash: ${result.trashed.join(", ")}.` : "";
-      statusEl.textContent = `Wallpaper set to ${t.toFixed(2)} s in copper and gray.${trashed}`;
+      statusEl.textContent = `Wallpaper set to ${t.toFixed(2)} s in copper and gray at ${W}×${H}.`;
       await refreshInstalled();
     } else {
       for (const c of colours) {
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blobs[c]);
-        a.download = `ornn-fluted-${c}-t${t.toFixed(2)}s-${EXPORT.w}x${EXPORT.h}.png`;
+        a.download = `ornn-fluted-${c}-t${t.toFixed(2)}s-${W}x${H}.png`;
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(() => URL.revokeObjectURL(a.href), 60000);
       }
       statusEl.textContent = `Downloaded copper and gray at ${t.toFixed(2)} s.`;
     }
-    return { t, mode, sizes: Object.fromEntries(colours.map((c) => [c, blobs[c].size])), result };
+    return { t, mode, w: W, h: H, sizes: Object.fromEntries(colours.map((c) => [c, blobs[c].size])), result };
   } catch (e) {
     statusEl.innerHTML = `<span class="err">${mode === "install" ? "Saving" : "Download"} failed: ${e.message}</span>`;
     throw e;
@@ -715,12 +773,14 @@ function segmented(id, key, onChange) {
   });
 }
 segmented("framing", "framing", layoutPreviews);
-segmented("stripColour", "stripColour", () => {
+function refreshVisibleThumbs() {
+  const s = strip.getBoundingClientRect();
   for (const th of thumbs) {
-    const r = th.el.getBoundingClientRect(), s = strip.getBoundingClientRect();
+    const r = th.el.getBoundingClientRect();
     if (r.right > s.left - 400 && r.left < s.right + 400) thumbQueue.add(th);
   }
-});
+}
+segmented("stripColour", "stripColour", refreshVisibleThumbs);
 
 document.addEventListener("keydown", (e) => {
   if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
@@ -733,9 +793,8 @@ document.addEventListener("keydown", (e) => {
 let resizeTimer;
 window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(layoutPreviews, 120); });
 
-layoutPreviews();
+setDisplays(screenDisplays(), screenDisplays()[0]);
 setT(0);
-drawShortlist();
 requestAnimationFrame(tick);
 // Open on the frame that is currently installed
 const ready = refreshInstalled().then((info) => { if (info) setT(info.t); return info; });

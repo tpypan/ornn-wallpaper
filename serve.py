@@ -4,24 +4,60 @@
 # Wallpapers live at stable paths (ornn-fluted-copper.png / ornn-fluted-gray.png) because macOS stores the
 # wallpaper as a file path. Installing replaces the file atomically, then restarts WallpaperAgent so the new
 # image shows immediately; the restart re-reads the files and leaves the wallpaper settings untouched.
-import argparse, json, os, plistlib, re, shutil, struct, subprocess, threading, time
+# The export size comes from the connected displays, so one file fills each of them without upscaling.
+import argparse, json, os, plistlib, re, struct, subprocess, threading, time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 WALLPAPERS = Path.home() / "Pictures" / "Wallpapers"
-TRASH = Path.home() / ".Trash"
-WALLPAPER_INDEX = Path.home() / "Library/Application Support/com.apple.wallpaper/Store/Index.plist"
+WALLPAPER_INDEX = Path.home() / "Library/Application Support/com.apple.wallpaper/Store/Index.plist"  # macOS 14+
 COLOURS = ("copper", "gray")
-SIZE = (5120, 2880)
-LEGACY = re.compile(r"^ornn-fluted-(copper|gray)(-.+)?\.png$")  # older per-frame names
+FALLBACK_SIZE = (5120, 2880)
+MAX_SIDE, MAX_PIXELS = 16384, 120_000_000
 IDLE_EXIT_S = 3 * 3600
+
+# Every NSScreen's backing store in pixels: the "looks like" size times the scale factor
+SCREENS_JXA = """
+ObjC.import("AppKit");
+const s = $.NSScreen.screens, out = [];
+for (let i = 0; i < s.count; i++) {
+  const sc = s.objectAtIndex(i), f = sc.frame, k = sc.backingScaleFactor;
+  out.push({ name: ObjC.unwrap(sc.localizedName) || `Display ${i + 1}`,
+             w: Math.round(f.size.width * k), h: Math.round(f.size.height * k), scale: k });
+}
+JSON.stringify(out);
+"""
 
 last_request = time.monotonic()
 
 
 def stable_path(colour):
     return WALLPAPERS / f"ornn-fluted-{colour}.png"
+
+
+def displays():
+    try:
+        out = subprocess.run(["osascript", "-l", "JavaScript", "-e", SCREENS_JXA],
+                             capture_output=True, text=True, timeout=10, check=True).stdout
+        return [d for d in json.loads(out) if d["w"] > 0 and d["h"] > 0]
+    except Exception:
+        return []
+
+
+def parse_size(text):
+    m = re.fullmatch(r"\s*(\d+)\s*[x×]\s*(\d+)\s*", text or "")
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
+def export_size(screens):
+    # Fill Screen scales by max(dw / W, dh / H); keeping W and H at least every display's pixels keeps that ≤ 1
+    override = parse_size(os.environ.get("ORNN_PICKER_SIZE"))
+    if override:
+        return override
+    if not screens:
+        return FALLBACK_SIZE
+    return max(d["w"] for d in screens), max(d["h"] for d in screens)
 
 
 def png_chunks(data):
@@ -49,22 +85,23 @@ def frame_info(data):
 def validate(data, colour):
     chunks = dict(png_chunks(data))
     w, h, depth, ctype = struct.unpack(">IIBB", chunks["IHDR"][:10])
-    if (w, h) != SIZE or depth != 8 or ctype != 2:
-        raise ValueError(f"expected 8-bit RGB {SIZE[0]}x{SIZE[1]}, got {w}x{h} depth {depth} type {ctype}")
+    if not (0 < w <= MAX_SIDE and 0 < h <= MAX_SIDE and w * h <= MAX_PIXELS) or depth != 8 or ctype != 2:
+        raise ValueError(f"expected 8-bit RGB up to {MAX_SIDE} px a side, got {w}x{h} depth {depth} type {ctype}")
     if not chunks.get("iCCP", b"").startswith(b"sRGB IEC61966-2.1\0"):
         raise ValueError("missing embedded sRGB profile")
     info = frame_info(data)
-    if not info or info.get("colour") != colour:
+    if not info or info.get("colour") != colour or (info.get("w"), info.get("h")) != (w, h):
         raise ValueError("missing or mismatched ornn-frame metadata")
     return info
 
 
 def wallpaper_paths():
-    # Every image path the wallpaper settings point at, including SystemDefault (read-only)
+    # Every image path the wallpaper settings point at, including SystemDefault; None if unreadable
+    # (macOS 13 and older keep these settings elsewhere)
     try:
         index = plistlib.loads(WALLPAPER_INDEX.read_bytes())
     except Exception:
-        return []
+        return None
     found = []
 
     def walk(node):
@@ -98,13 +135,16 @@ def status():
         else:
             files[c] = None
     in_use = wallpaper_paths()
-    legacy = sorted(p.name for p in WALLPAPERS.glob("ornn-fluted-*.png") if LEGACY.match(p.name) and p.name not in {stable_path(c).name for c in COLOURS})
+    screens = displays()
+    w, h = export_size(screens)
     return {
         "dir": str(WALLPAPERS),
         "files": files,
         "wallpaper": in_use,
-        "usesStable": any(path in in_use for path in (str(stable_path(c)) for c in COLOURS)),
-        "legacy": legacy,
+        # None when this macOS version's wallpaper settings can't be read
+        "usesStable": None if in_use is None else any(str(stable_path(c)) in in_use for c in COLOURS),
+        "displays": screens,
+        "export": {"w": w, "h": h, "override": bool(parse_size(os.environ.get("ORNN_PICKER_SIZE")))},
     }
 
 
@@ -118,21 +158,10 @@ def install(colour, data):
 
 
 def finish():
-    # Trash older per-frame files, except any the wallpaper settings still point at
-    in_use = set(wallpaper_paths())
-    trashed, kept = [], []
-    for name in status()["legacy"]:
-        p = WALLPAPERS / name
-        if str(p) in in_use:
-            kept.append(name)
-            continue
-        dest = TRASH / name
-        if dest.exists():
-            dest = TRASH / f"{p.stem} {time.strftime('%H.%M.%S')}{p.suffix}"
-        shutil.move(p, dest)
-        trashed.append(name)
-    subprocess.run(["killall", "WallpaperAgent"], capture_output=True)
-    return {"trashed": trashed, "keptInUse": kept}
+    # macOS 14+ draws wallpapers in WallpaperAgent; older versions draw them in the Dock
+    if subprocess.run(["killall", "WallpaperAgent"], capture_output=True).returncode != 0:
+        subprocess.run(["killall", "Dock"], capture_output=True)
+    return {}
 
 
 class Handler(SimpleHTTPRequestHandler):

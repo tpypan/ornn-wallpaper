@@ -1,23 +1,42 @@
 #!/bin/zsh
 # Ornn fluted-glass wallpaper picker.
-#   ./picker          open the picker in Chrome (starts the local helper if it isn't running)
+#   ./picker          open the picker in the browser (starts the local helper if it isn't running)
 #   ./picker 385.5    render that frame (seconds) and set it as the wallpaper without opening the UI
+# Env: ORNN_PICKER_PORT (default 8765), ORNN_PICKER_SIZE=WxH to force the export size, CHROME=/path/to/binary
 set -euo pipefail
 dir=${0:A:h}
-port=8765
+port=${ORNN_PICKER_PORT:-8765}
 url="http://127.0.0.1:$port/"
+log="${TMPDIR:-/tmp}/ornn-picker.log"
 
-if ! curl -fsS -m 1 "${url}api/status" >/dev/null 2>&1; then
-  nohup python3 -I "$dir/serve.py" --port $port >"${TMPDIR:-/tmp}/ornn-picker.log" 2>&1 &!
-  for _ in {1..50}; do
-    curl -fsS -m 1 "${url}api/status" >/dev/null 2>&1 && break
+if ! python3 -c 'import sys; sys.exit(sys.version_info < (3, 9))' 2>/dev/null; then
+  print -u2 "The picker needs Python 3.9+. Install Apple's command line tools with: xcode-select --install"
+  exit 1
+fi
+
+# Our helper answers /api/status with JSON that includes "usesStable"; anything else on the port is not ours
+ours() { curl -fsS -m 1 "${url}api/status" 2>/dev/null | grep -q '"usesStable"'; }
+
+if ! ours; then
+  if curl -s -m 1 -o /dev/null "$url" 2>/dev/null; then
+    print -u2 "Port $port is in use by another program. Run with ORNN_PICKER_PORT=<free port> ./picker"
+    exit 1
+  fi
+  nohup python3 -I "$dir/serve.py" --port $port >"$log" 2>&1 &!
+  for _ in {1..100}; do
+    ours && break
     sleep 0.1
   done
+  if ! ours; then
+    print -u2 "The picker helper didn't start. Its log ($log):"
+    tail -n 20 "$log" >&2
+    exit 1
+  fi
 fi
 
 if (( $# )); then
-  exec uv run --quiet --with websockets python -I "$dir/render.py" "$url" "$1"
-elif [[ -d "/Applications/Google Chrome.app" ]]; then
+  exec python3 -I "$dir/render.py" "$url" "$1"
+elif [[ -d "/Applications/Google Chrome.app" || -d "$HOME/Applications/Google Chrome.app" ]]; then
   open -a "Google Chrome" "$url"
 else
   open "$url"
