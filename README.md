@@ -1,4 +1,4 @@
-# Ornn frame picker
+# Ornn wallpaper
 
 Picks a frame of ornn.com's fluted-glass hero shader and sets it as the Mac wallpaper. It renders the site's own WebGL shader, so there's no video involved.
 
