@@ -129,10 +129,10 @@
 <div class="shortlist" id="shortlist"><span class="sub">Press <kbd>S</kbd> or ★ to keep frames you like here.</span></div>
 
 <div class="help">
-  <b>Navigate.</b> Scroll over a preview to scrub (hold <kbd>⇧</kbd> for fine steps). <kbd>←</kbd>/<kbd>→</kbd> moves one frame (1/60 s), <kbd>⇧</kbd>+arrow moves 1 s, and <kbd>Space</kbd> plays the motion at site speed. Click a frame in the strip to jump to it. Scrubbing past the end wraps to the start, because 523.6 s is the same image as 0 s.<br>
+  <b>Navigate.</b> Scroll over a preview to scrub (hold <kbd>⇧</kbd> for fine steps). <kbd>←</kbd>/<kbd>→</kbd> moves one frame (1/60 s), <kbd>⇧</kbd>+arrow moves 1 s, and <kbd>Space</kbd> plays the motion at site speed. Click a frame in the strip to jump to it. Scrubbing past the end wraps to the start, because 523.6 s is the same image as 0 s.<span id="localHelp"><br>
   <b>Set as wallpaper.</b> Renders both colours (128 passes, sRGB) and replaces <code>~/Pictures/Wallpapers/ornn-fluted-copper.png</code> and <code>ornn-fluted-gray.png</code> in place. Your desktop then refreshes on its own. The filenames never change, so your wallpaper setting keeps working. The frame's time is stored inside each PNG, and the picker reopens on it next time.<br>
   <b>Why one size.</b> The file is as wide as your widest display and as tall as your tallest, counted in real pixels (the "looks like" size × 2 on Retina). "Fill Screen" then only ever shrinks it, and trims whatever doesn't fit a display's shape. The dashed boxes show what each display keeps. Plug in a bigger display and the next save grows to match.<br>
-  <b>First time only.</b> In System Settings → Wallpaper, choose <code>ornn-fluted-copper.png</code> (or gray) with "Fill Screen". After that, this button is all you need.
+  <b>First time only.</b> In System Settings → Wallpaper, choose <code>ornn-fluted-copper.png</code> (or gray) with "Fill Screen". After that, this button is all you need.</span>
 </div>
 
 <canvas id="gl" width="1" height="1" style="display:none"></canvas>
@@ -788,6 +788,13 @@ async function refreshInstalled() {
   if (!location.protocol.startsWith("http")) {
     applyBtn.style.display = "none";
     installedEl.innerHTML = 'Opened as a file, so only downloads work, sized for this screen only. Run <code>./picker</code> to save straight to your wallpaper.';
+    return null;
+  }
+  // The helper only listens on 127.0.0.1, so any other host is the hosted copy
+  if (!["127.0.0.1", "localhost"].includes(location.hostname)) {
+    applyBtn.style.display = "none";
+    document.getElementById("localHelp").hidden = true;
+    installedEl.innerHTML = 'Downloads are sized for this screen only. Set one as your wallpaper with "Fill Screen". To save straight to your Mac wallpaper at every display\'s size, run the picker locally: <a href="https://github.com/tpypan/ornn-wallpaper">github.com/tpypan/ornn-wallpaper</a>.';
     return null;
   }
   try {

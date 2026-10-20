@@ -2,6 +2,8 @@
 
 Picks a frame of ornn.com's fluted-glass hero shader and sets it as the Mac wallpaper. It renders the site's own WebGL shader, so there's no video involved.
 
+Try it in the browser at **https://ornn-wallpaper.vercel.app**. The hosted page can preview frames and download PNGs sized for your screen. Saving straight to your wallpaper at every display's size needs the local picker below.
+
 ## Requirements
 
 - macOS, Apple silicon or Intel. Reloading the wallpaper in place works best on macOS 14 Sonoma or later.
